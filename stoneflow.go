@@ -315,6 +315,10 @@ func (stoneflow *StoneFlow) ParseFlowRecord(buf []byte) error {
 
 		buf = buf[8:]
 
+		if len(buf) < int(flowLength) {
+			return errors.New("Invalid flow length")
+		}
+
 		flowBuf := buf[:flowLength]
 		buf = buf[flowLength:]
 
