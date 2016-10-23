@@ -30,11 +30,11 @@ import (
 
 var log = logging.MustGetLogger("s2flow")
 
-type sFlow struct {
-	readIn chan *EtherFrame
+type StoneFlow struct {
+	ReadIn chan *EtherFrame
 }
 
-func (sflow *sFlow) ParseTypeTwo(buf []byte) {
+func (stoneflow *StoneFlow) ParseTypeTwo(buf []byte) {
 	log.Debugf("Parsing Version 5")
 	for len(buf) > 0 {
 		if len(buf) < 8 {
@@ -46,14 +46,14 @@ func (sflow *sFlow) ParseTypeTwo(buf []byte) {
 			if len(buf) < 88 {
 				return
 			}
-			ifCounters := sflow.ParseIfCounters(buf)
+			ifCounters := stoneflow.ParseIfCounters(buf)
 			log.Debugf("If Counters: %v", ifCounters)
 			buf = buf[88:]
 		} else if sFlowType == 2 {
 			if len(buf) < 52 {
 				return
 			}
-			ethernetCounters := sflow.ParseEthernetCounters(buf)
+			ethernetCounters := stoneflow.ParseEthernetCounters(buf)
 			log.Debugf("Ethernet Counters: %v", ethernetCounters)
 			buf = buf[52:]
 		} else if sFlowType == 3 {
@@ -66,7 +66,7 @@ func (sflow *sFlow) ParseTypeTwo(buf []byte) {
 			if len(buf) < 80 {
 				return
 			}
-			vlanCounters := sflow.ParseVlanCounters(buf)
+			vlanCounters := stoneflow.ParseVlanCounters(buf)
 			log.Debugf("Vlan Counters: %v", vlanCounters)
 			buf = buf[80:]
 		} else if sFlowType == 5 {
@@ -75,7 +75,7 @@ func (sflow *sFlow) ParseTypeTwo(buf []byte) {
 			}
 
 			log.Debugf("Parsing Type 4")
-			vlanCounters := sflow.ParseVlanCounters(buf)
+			vlanCounters := stoneflow.ParseVlanCounters(buf)
 			log.Debugf("Vlan Counters: %v", vlanCounters)
 			buf = buf[28:]
 		} else if sFlowType > 5 || sFlowType <= 0 {
@@ -96,7 +96,7 @@ type Headers struct {
 	numSamples     uint32
 }
 
-func (sflow *sFlow) ParseHeaders(buf []byte) (*Headers, error) {
+func (stoneflow *StoneFlow) ParseHeaders(buf []byte) (*Headers, error) {
 	if len(buf) < 8 {
 		return nil, errors.New("Invalid header length")
 	}
@@ -151,7 +151,7 @@ type SampleDataHeader struct {
 	flowRecords    uint32
 }
 
-func (sflow *sFlow) ParseSampleHeader(buf []byte) *SampleDataHeader {
+func (stoneflow *StoneFlow) ParseSampleHeader(buf []byte) *SampleDataHeader {
 	log.Debugf("%v\n", buf)
 	parsedSampleDataHeader := &SampleDataHeader{
 		sequenceNumber: binary.BigEndian.Uint32(buf[0:4]),
@@ -189,7 +189,7 @@ type IfCounters struct {
 	ifPromiscuousMode  uint32
 }
 
-func (sflow *sFlow) ParseIfCounters(buf []byte) *IfCounters {
+func (stoneflow *StoneFlow) ParseIfCounters(buf []byte) *IfCounters {
 	parsedIfCounters := &IfCounters{
 		ifIndex:            binary.BigEndian.Uint32(buf[0:4]),
 		ifType:             binary.BigEndian.Uint32(buf[4:8]),
@@ -230,7 +230,7 @@ type EthernetCounters struct {
 	dot3StatsSymbolErrors              uint32
 }
 
-func (sflow *sFlow) ParseEthernetCounters(buf []byte) *EthernetCounters {
+func (stoneflow *StoneFlow) ParseEthernetCounters(buf []byte) *EthernetCounters {
 
 	parsedEthernetCounters := &EthernetCounters{
 		dot3StatsAlignmentErrors:           binary.BigEndian.Uint32(buf[0:4]),
@@ -259,7 +259,7 @@ type VlanCounters struct {
 	discards      uint32
 }
 
-func (sflow *sFlow) ParseVlanCounters(buf []byte) *VlanCounters {
+func (stoneflow *StoneFlow) ParseVlanCounters(buf []byte) *VlanCounters {
 
 	parsedVlanCounters := &VlanCounters{
 		vlanId:        binary.BigEndian.Uint32(buf[0:4]),
@@ -272,7 +272,7 @@ func (sflow *sFlow) ParseVlanCounters(buf []byte) *VlanCounters {
 	return parsedVlanCounters
 }
 
-func (sflow *sFlow) CheckError(err error) bool {
+func (stoneflow *StoneFlow) CheckError(err error) bool {
 	if err != nil {
 		log.Errorf("Error: %v", err)
 
@@ -291,7 +291,7 @@ type EtherFrame struct {
 	DstPort []byte
 }
 
-func (sflow *sFlow) ParseFrame(buf []byte) *EtherFrame {
+func (stoneflow *StoneFlow) ParseFrame(buf []byte) *EtherFrame {
 	etherFrame := &EtherFrame{
 		SrcMac:  buf[16:22],
 		DstMac:  buf[22:28],
@@ -303,7 +303,7 @@ func (sflow *sFlow) ParseFrame(buf []byte) *EtherFrame {
 	return etherFrame
 }
 
-func (sflow *sFlow) ParseFlowRecord(buf []byte) error {
+func (stoneflow *StoneFlow) ParseFlowRecord(buf []byte) error {
 	for len(buf) > 0 {
 		dataFormat := binary.BigEndian.Uint32(buf[0:4])
 		flowLength := binary.BigEndian.Uint32(buf[4:8])
@@ -320,9 +320,9 @@ func (sflow *sFlow) ParseFlowRecord(buf []byte) error {
 
 		if dataFormat == 1 {
 			log.Debug("Parsing flow record of Type 1.")
-			frame := sflow.ParseFrame(flowBuf)
+			frame := stoneflow.ParseFrame(flowBuf)
 			log.Debug("Frame: %v", frame)
-			sflow.readIn <- frame
+			stoneflow.ReadIn <- frame
 		}
 		if dataFormat == 1001 {
 			log.Debug("Parsing flow record of Type 1001.")
@@ -331,16 +331,16 @@ func (sflow *sFlow) ParseFlowRecord(buf []byte) error {
 	return nil
 }
 
-func (sflow *sFlow) ParseSampleData(buf []byte) error {
+func (stoneflow *StoneFlow) ParseSampleData(buf []byte) error {
 	var err error
 	if len(buf) < 33 {
 		return errors.New("Incorrect length for Sample Data header")
 	}
-	sampleHeader := sflow.ParseSampleHeader(buf)
+	sampleHeader := stoneflow.ParseSampleHeader(buf)
 	log.Infof("Sample Header: %v", sampleHeader)
 	buf = buf[32:]
-	err = sflow.ParseFlowRecord(buf)
-	if sflow.CheckError(err) {
+	err = stoneflow.ParseFlowRecord(buf)
+	if stoneflow.CheckError(err) {
 		return err
 	}
 
@@ -349,7 +349,7 @@ func (sflow *sFlow) ParseSampleData(buf []byte) error {
 	return nil
 }
 
-func (sflow *sFlow) ParseVersionFive(buf []byte) {
+func (stoneflow *StoneFlow) ParseVersionFive(buf []byte) {
 	for len(buf) > 0 {
 		log.Debug("Parsing Version 5")
 		if len(buf) < 8 {
@@ -367,14 +367,14 @@ func (sflow *sFlow) ParseVersionFive(buf []byte) {
 			buf = buf[4:]
 			buf = buf[:sampleLength]
 			log.Debug("Parsing Sample Data")
-			sflow.ParseSampleData(buf)
+			stoneflow.ParseSampleData(buf)
 		}
 	}
 }
 
-func (sflow *sFlow) DatagramHandler(buf []byte) {
-	sFlowHeaders, err := sflow.ParseHeaders(buf)
-	if sflow.CheckError(err) {
+func (stoneflow *StoneFlow) DatagramHandler(buf []byte) {
+	sFlowHeaders, err := stoneflow.ParseHeaders(buf)
+	if stoneflow.CheckError(err) {
 		return
 	}
 
@@ -385,11 +385,11 @@ func (sflow *sFlow) DatagramHandler(buf []byte) {
 	} else {
 		buf = buf[24+len(sFlowHeaders.address):]
 		log.Debugf("Len: %v", 24+len(sFlowHeaders.address))
-		sflow.ParseVersionFive(buf)
+		stoneflow.ParseVersionFive(buf)
 	}
 }
 
-func (sflow *sFlow) StartSFlow() {
+func (stoneflow *StoneFlow) StartSFlow() {
 	address, err := net.ResolveUDPAddr("udp", ":6343")
 	l, err := net.ListenUDP("udp", address)
 	if err != nil {
@@ -400,16 +400,16 @@ func (sflow *sFlow) StartSFlow() {
 	for {
 		buf := make([]byte, 1500)
 		_, _, err := l.ReadFromUDP(buf)
-		sflow.CheckError(err)
+		stoneflow.CheckError(err)
 		//log.Debugf("Received from %v: %v\n", addr, buf)
-		go sflow.DatagramHandler(buf)
+		go stoneflow.DatagramHandler(buf)
 	}
 }
 
-func CreateSFlow() *sFlow {
-	sflowChannel := make(chan *EtherFrame)
-	sflow := &sFlow{readIn: sflowChannel}
-	go sflow.StartSFlow()
+func CreateSFlow() *StoneFlow {
+	stoneflowchannel := make(chan *EtherFrame)
+	stoneflow := &StoneFlow{ReadIn: stoneflowchannel}
+	go stoneflow.StartSFlow()
 
-	return sflow
+	return stoneflow
 }
