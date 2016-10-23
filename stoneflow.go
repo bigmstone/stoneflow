@@ -18,7 +18,7 @@ with the License.  You may obtain a copy of the License at
 
   Copyright and stuff 2016. Matthew Stone
 */
-package sflow
+package stoneflow
 
 import (
 	"encoding/binary"
