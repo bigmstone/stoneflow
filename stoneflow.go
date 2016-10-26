@@ -398,10 +398,15 @@ func (stoneflow *StoneFlow) StartSFlow() {
 
 	for {
 		buf := make([]byte, 1500)
-		_, _, err := l.ReadFromUDP(buf)
+		n, _, err := l.ReadFromUDP(buf)
 		stoneflow.CheckError(err)
 		//log.Debugf("Received from %v: %v\n", addr, buf)
-		go stoneflow.DatagramHandler(buf)
+
+		// Make a copy of the received data
+		pkt := make([]byte, n)
+		copy(pkt, buf)
+
+		go stoneflow.DatagramHandler(pkt)
 	}
 }
 
